@@ -1,2 +1,12 @@
-{ "name": "Quản lý tài sản Sói Biển", "short_name": "Tài sản SB", "start_url": "/", "display": "standalone", "background_color": "#ffffff", "theme_color": "#0b3954",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }] }
+{
+  "name": "Quản lý tài sản Sói Biển",
+  "short_name": "Tài sản SB",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#006646",
+  "theme_color": "#006646",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

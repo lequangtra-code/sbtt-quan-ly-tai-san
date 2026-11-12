@@ -165,7 +165,7 @@ function shell(path) {
     return `<div class="grp">${g}</div>` + vis.map(([href, ic, label]) => `<a href="${href}" class="${(href === '/' ? path === '/' : path === href || (href === '/assets' && /^\/assets\/\d/.test(path))) ? 'active' : ''}"><span class="ic">${ic}</span>${label}</a>`).join('');
   }).join('');
   return `<div class="shell"><aside class="side" id="side">
-      <div class="brand"><img src="/icon.svg" alt=""><div><b>${esc(S.cfg.companyShort || 'SÓI BIỂN')}</b><small>Quản lý tài sản tập trung</small></div></div>
+      <div class="brand"><img src="/brand/logo-full-white.png" alt="${esc(S.cfg.companyShort || 'SÓI BIỂN')}"><small>Hệ thống quản lý tài sản</small></div>
       <nav class="nav">${nav}</nav>
       <div class="me"><b>${esc(S.me.full_name)}</b>${esc(S.me.role_name)}<div style="margin-top:6px"><a href="/change-password">Đổi mật khẩu</a><a href="#" id="logout">Đăng xuất</a></div></div>
     </aside><main class="main"><div class="top"><button class="btn menu-btn" id="menu">☰</button><h1 id="title"></h1><div class="sp"></div><div id="top-actions" class="row"></div></div>
@@ -185,7 +185,8 @@ async function pageLogin(el) {
   const next = p.get('next') || '/';
   if (S.me && !S.me.must_change_password) return go(next);
   el.innerHTML = `<div class="login-wrap"><div class="login">
-    <div class="logo"><img src="/icon.svg" alt=""><div><b>${esc(S.cfg.companyName || '')}</b><small>Hệ thống Quản lý tài sản tập trung</small></div></div>
+    <div class="login-brand"><img src="/brand/logo-full-white.png" alt="Sói Biển"></div>
+    <div class="login-title"><b>Hệ thống Quản lý tài sản</b><small>${esc(S.cfg.companyName || '')}</small></div>
     ${p.get('error') ? `<div class="alert bad">${esc(p.get('error'))}</div>` : ''}
     <div class="tabs"><button class="on" data-tab="pw">Mật khẩu</button><button data-tab="otp">Mã OTP qua SMS</button></div>
     <form id="f-pw" class="stack">
@@ -218,7 +219,7 @@ async function pageLogin(el) {
 async function pageChangePw(el) {
   if (!S.me) return go('/login');
   const forced = S.me.must_change_password;
-  el.innerHTML = `<div class="login-wrap"><div class="login"><div class="logo"><img src="/icon.svg"><div><b>Đổi mật khẩu</b><small>${esc(S.me.full_name)}</small></div></div>
+  el.innerHTML = `<div class="login-wrap"><div class="login"><div class="logo"><img src="/brand/icon-192.png" alt=""><div><b>Đổi mật khẩu</b><small>${esc(S.me.full_name)}</small></div></div>
     ${forced ? '<div class="alert warn">Đây là lần đăng nhập đầu tiên hoặc mật khẩu vừa được đặt lại. Vui lòng đặt mật khẩu mới.</div>' : ''}
     <form class="stack">${field({ name: 'current', label: 'Mật khẩu hiện tại', type: 'password', attrs: 'autocomplete="current-password"' })}
     ${field({ name: 'next', label: 'Mật khẩu mới (≥ 8 ký tự, có chữ và số)', type: 'password', attrs: 'autocomplete="new-password" required' })}
@@ -496,7 +497,7 @@ async function pageScan(el, token) {
   const loginLink = `/login?next=${encodeURIComponent(location.pathname)}`;
   if (d.login_required) { box.innerHTML = `<div class="alert">Vui lòng đăng nhập để xem tài sản.</div><a class="btn primary" href="${loginLink}">Đăng nhập</a>`; return; }
   const a = d.asset;
-  const header = `<div class="hero"><div class="row"><img src="/icon.svg" width="28"><b style="flex:1">${esc(S.cfg.companyShort || '')} · Tài sản</b>${S.me ? `<a href="/" style="color:#9fd3d8">Mở hệ thống ›</a>` : ''}</div>
+  const header = `<div class="hero"><div class="row"><img src="/brand/logo-mark-white.png" alt="" style="height:30px"><b style="flex:1">${esc(S.cfg.companyShort || '')} · Tài sản</b>${S.me ? `<a href="/" style="color:#cdeedd">Mở hệ thống ›</a>` : ''}</div>
     <div class="code" style="margin-top:10px">${esc(a.asset_code)}</div><h1>${esc(a.name)}</h1><div>${badge(STATUS, a.status)} <span style="opacity:.85">${esc(a.location_code)} · ${esc(a.location_name)}</span></div></div>`;
   if (d.mode !== 'full') {
     box.innerHTML = header + `<div class="card"><dl class="kv"><dt>Loại</dt><dd>${esc(a.category_name)}</dd><dt>Vị trí</dt><dd>${esc(a.area || '—')}</dd>${a.hotline ? `<dt>Hotline bảo trì</dt><dd><a href="tel:${esc(a.hotline)}">${esc(a.hotline)}</a></dd>` : ''}</dl></div>

@@ -6,7 +6,11 @@ import { PGlite } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 
+// Cố định tài khoản quản trị – không phụ thuộc file .env của máy đang chạy
+process.env.ADMIN_EMAIL = 'admin@soibien.vn';
+process.env.ADMIN_PHONE = '0900000000';
 process.env.ADMIN_PASSWORD = 'Admin@2026x';
+process.env.PUBLIC_BASE_URL = 'http://localhost:8080';
 const { createApp } = await import('../server/app.js');
 const { createSql, setDefaultSql } = await import('../server/db.js');
 const { setupDatabase } = await import('../server/setup.js');

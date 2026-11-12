@@ -264,7 +264,7 @@ export default function registerAssets({ db, api, audit, config }) {
 <style>
   @page { margin: 6mm; }
   body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #000; }
-  .bar { padding: 12px; background: #0b4a6f; color: #fff; display: flex; gap: 12px; align-items: center; }
+  .bar { padding: 12px; background: #006646; color: #fff; display: flex; gap: 12px; align-items: center; }
   .bar button { font-size: 15px; padding: 8px 16px; cursor: pointer; }
   .sheet { display: flex; flex-wrap: wrap; gap: 3mm; padding: 4mm; }
   .label { width: ${size[0]}mm; height: ${size[1]}mm; border: 0.3mm dashed #888; box-sizing: border-box; padding: 1.5mm; display: flex; gap: 1.5mm; align-items: center; page-break-inside: avoid; overflow: hidden; }
