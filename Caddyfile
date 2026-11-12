@@ -1,0 +1,5 @@
+# Đổi thành tên miền thật; Caddy tự xin chứng chỉ HTTPS
+taisan.soibien.vn {
+  encode gzip
+  reverse_proxy app:8080
+}

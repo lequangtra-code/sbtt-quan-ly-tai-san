@@ -1,0 +1,26 @@
+{
+  "name": "sbtt-quan-ly-tai-san",
+  "version": "2.0.0",
+  "description": "Hệ thống Quản lý tài sản tập trung - Công ty Cổ phần Sói Biển Trung Thực",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "dev:db": "node scripts/dev-db.js --demo",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:setup": "node scripts/db-setup.js",
+    "test": "node test/api.test.js",
+    "start": "node server/index.js",
+    "demo": "node scripts/seed-demo.js",
+    "backup": "node scripts/backup.js"
+  },
+  "dependencies": {
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
+    "@electric-sql/pglite-socket": "^0.2.19",
+    "wrangler": "^4.160.1"
+  }
+}

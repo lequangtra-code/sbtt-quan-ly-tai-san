@@ -1,0 +1,47 @@
+// Cấu hình Cloudflare Workers – website https://taisan.soibien.vn
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "taisan-soibien",
+  "main": "server/worker.js",
+  "compatibility_date": "2025-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Giao diện (public/) phục vụ trực tiếp từ mạng CDN của Cloudflare – không tốn CPU Worker.
+  // Chỉ /api/*, /auth/*, /print/* mới chạy Worker. Đường dẫn khác (vd /q/<mã>) trả về index.html.
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/auth/*", "/print/*"]
+  },
+
+  // Kết nối Supabase PostgreSQL qua Hyperdrive.
+  // Tạo bằng: npx wrangler hyperdrive create taisan-db --connection-string="postgresql://..."
+  // rồi dán ID nhận được vào đây.
+  "hyperdrive": [
+    { "binding": "HYPERDRIVE", "id": "THAY_BANG_HYPERDRIVE_ID" }
+  ],
+
+  // Tên miền riêng (soibien.vn phải đang dùng DNS của Cloudflare)
+  "routes": [
+    { "pattern": "taisan.soibien.vn", "custom_domain": true }
+  ],
+
+  // Cấu hình không bí mật. Thông tin bí mật (ADMIN_PASSWORD, GOOGLE_CLIENT_SECRET, SMS_WEBHOOK_TOKEN...)
+  // khai báo bằng: npx wrangler secret put TEN_BIEN  (hoặc trên Dashboard → Settings → Variables and Secrets)
+  "vars": {
+    "PUBLIC_BASE_URL": "https://taisan.soibien.vn",
+    "COMPANY_NAME": "CÔNG TY CỔ PHẦN SÓI BIỂN TRUNG THỰC",
+    "COMPANY_SHORT": "SÓI BIỂN",
+    "MAINTENANCE_HOTLINE": "",
+    "SESSION_DAYS": "14",
+    "SMS_PROVIDER": "console",
+    "PUBLIC_SCAN": "true",
+    "GOOGLE_ALLOWED_DOMAINS": ""
+  },
+
+  // Chạy Worker gần CSDL (Supabase ở Mumbai) thay vì gần người dùng: mỗi request gọi CSDL nhiều lần
+  // nên đặt gần CSDL nhanh hơn. Giao diện tĩnh vẫn phục vụ từ máy chủ Cloudflare gần người dùng.
+  "placement": { "mode": "smart" },
+
+  "observability": { "enabled": true }
+}

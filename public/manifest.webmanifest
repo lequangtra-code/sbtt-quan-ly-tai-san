@@ -1,0 +1,2 @@
+{ "name": "Quản lý tài sản Sói Biển", "short_name": "Tài sản SB", "start_url": "/", "display": "standalone", "background_color": "#ffffff", "theme_color": "#0b3954",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }] }

@@ -1,0 +1,16 @@
+# Phương án dự phòng (máy chủ riêng). Phương án chính là Cloudflare Workers – xem README mục 7.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    depends_on: [app]
+volumes:
+  caddy_data:
