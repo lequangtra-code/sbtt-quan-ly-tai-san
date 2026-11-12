@@ -184,37 +184,34 @@ async function pageLogin(el) {
   const p = new URLSearchParams(location.search);
   const next = p.get('next') || '/';
   if (S.me && !S.me.must_change_password) return go(next);
-  el.innerHTML = `<div class="login-wrap"><div class="login">
-    <div class="login-brand"><img src="/brand/logo-full-white.png" alt="Sói Biển"></div>
-    <div class="login-title"><b>Hệ thống Quản lý tài sản</b><small>${esc(S.cfg.companyName || '')}</small></div>
+  el.innerHTML = `<div class="login-wrap"><div class="login login-v2">
+    <div class="login-tile"><img class="mark" src="/brand/logo-mark-white.png" alt=""><img class="text" src="/brand/logo-text-white.png" alt="Sói Biển"></div>
+    <h1 class="login-h">Sói Biển Tài Sản</h1>
+    <p class="login-sub">Đăng nhập bằng mã nhân viên của bạn</p>
     ${p.get('error') ? `<div class="alert bad">${esc(p.get('error'))}</div>` : ''}
-    <div class="tabs"><button class="on" data-tab="pw">Mật khẩu</button><button data-tab="otp">Mã OTP qua SMS</button></div>
     <form id="f-pw" class="stack">
-      ${field({ name: 'identifier', label: 'Email (Gmail) hoặc số điện thoại', placeholder: 'ten@gmail.com hoặc 09xxxxxxxx', attrs: 'autocomplete="username" required' })}
-      ${field({ name: 'password', label: 'Mật khẩu', type: 'password', attrs: 'autocomplete="current-password" required' })}
+      ${field({ name: 'identifier', label: 'Mã nhân viên', placeholder: 'Ví dụ: S0061', attrs: 'autocomplete="username" autocapitalize="characters" autocorrect="off" spellcheck="false" required autofocus' })}
+      <label class="f"><span>Mật khẩu</span><div class="pw-wrap"><input type="password" name="password" autocomplete="current-password" required><button type="button" class="pw-eye" aria-label="Hiện mật khẩu" title="Hiện mật khẩu">${EYE}</button></div></label>
       <button class="btn primary">Đăng nhập</button>
     </form>
-    <form id="f-otp" class="stack" hidden>
-      ${field({ name: 'phone', label: 'Số điện thoại đã đăng ký', placeholder: '09xxxxxxxx', attrs: 'inputmode="tel" required' })}
-      <div id="otp-step2" hidden>${field({ name: 'code', label: 'Mã OTP 6 số', attrs: 'inputmode="numeric" maxlength="6" autocomplete="one-time-code"' })}</div>
-      <button class="btn primary" id="otp-btn">Gửi mã OTP</button>
-    </form>
-    ${S.cfg.googleEnabled ? `<div class="or">hoặc</div><a class="btn gbtn" href="/auth/google?next=${encodeURIComponent(next)}"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg> Đăng nhập bằng Google (Gmail)</a>` : ''}
-    <p class="muted small" style="margin-top:16px">Tài khoản do quản trị viên cấp. Quên mật khẩu? Đăng nhập bằng OTP hoặc liên hệ phòng IT.</p>
+    <a href="#" class="login-forgot" id="forgot">Quên mật khẩu?</a>
+    ${S.cfg.googleEnabled ? `<div class="or">hoặc</div><a class="btn gbtn" href="/auth/google?next=${encodeURIComponent(next)}">Đăng nhập bằng Google (Gmail)</a>` : ''}
   </div></div>`;
   const done = async (r) => { S._tried = false; S.me = null; await loadSession(); go(r.mustChangePassword ? '/change-password' : next); };
-  $$('.tabs button', el).forEach((b) => b.onclick = () => { $$('.tabs button', el).forEach((x) => x.classList.toggle('on', x === b)); $('#f-pw').hidden = b.dataset.tab !== 'pw'; $('#f-otp').hidden = b.dataset.tab !== 'otp'; });
-  $('#f-pw').onsubmit = async (e) => { e.preventDefault(); try { await done(await POST('/api/auth/login', readForm(e.target))); } catch (err) { toast(err.message, true); } };
-  let sent = false;
-  $('#f-otp').onsubmit = async (e) => {
+  const pw = $('input[name=password]', el);
+  $('.pw-eye', el).onclick = (e) => { const show = pw.type === 'password'; pw.type = show ? 'text' : 'password'; e.currentTarget.innerHTML = show ? EYE_OFF : EYE; e.currentTarget.title = show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'; };
+  $('#forgot', el).onclick = (e) => { e.preventDefault(); toast('Liên hệ phòng Bảo trì - IT hoặc quản trị viên để được đặt lại mật khẩu.'); };
+  $('#f-pw').onsubmit = async (e) => {
     e.preventDefault();
     const f = readForm(e.target);
-    try {
-      if (!sent) { const r = await POST('/api/auth/otp/request', { phone: f.phone }); toast(r.message); sent = true; $('#otp-step2').hidden = false; $('#otp-btn').textContent = 'Xác nhận'; }
-      else await done(await POST('/api/auth/otp/verify', { phone: f.phone, code: f.code }));
-    } catch (err) { toast(err.message, true); }
+    f.identifier = String(f.identifier || '').trim();
+    if (/^sd+$/i.test(f.identifier)) f.identifier = f.identifier.toUpperCase();
+    try { await done(await POST('/api/auth/login', f)); } catch (err) { toast(err.message, true); }
   };
 }
+
+const EYE = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.9 8.3 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
 
 async function pageChangePw(el) {
   if (!S.me) return go('/login');

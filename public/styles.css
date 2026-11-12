@@ -170,6 +170,22 @@ dl.kv dd { margin: 0; font-weight: 500; word-break: break-word; }
 .or:before { left: 0; } .or:after { right: 0; }
 .gbtn { border: 1px solid #dadce0 !important; font-weight: 600; }
 
+/* Đăng nhập kiểu mới (mã nhân viên) */
+.login-v2 { padding: 32px 30px 26px; border-radius: 22px; width: min(440px, 100%); }
+.login-tile { width: 92px; height: 92px; border-radius: 20px; background: var(--brand); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 10px 8px; margin-bottom: 22px; box-shadow: 0 6px 16px rgba(0,102,70,.25); }
+.login-tile .mark { height: 30px; width: auto; }
+.login-tile .text { width: 100%; height: auto; }
+.login-h { font-size: 26px; font-weight: 800; color: #0f1f1a; margin: 0 0 8px; letter-spacing: -.3px; }
+.login-sub { color: var(--muted); font-size: 15px; margin: 0 0 22px; }
+.login-v2 label.f > span { font-size: 14px; color: #3a4a44; font-weight: 600; margin-bottom: 6px; }
+.login-v2 input { padding: 13px 14px; border-radius: 12px; font-size: 16px; border-color: #d4ddd8; }
+.login-v2 input:focus { outline: none; border: 2px solid var(--brand); padding: 12px 13px; }
+.login-v2 .btn.primary { padding: 14px; border-radius: 12px; font-size: 16px; margin-top: 4px; }
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 48px; }
+.pw-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: 0; color: #3a4a44; cursor: pointer; padding: 6px; display: grid; place-items: center; }
+.login-forgot { display: inline-block; margin-top: 6px; font-weight: 700; color: var(--brand); font-size: 15px; }
+
 /* Scan page (mobile-first) */
 .scan { max-width: 560px; margin: 0 auto; padding: 14px; }
 .scan .hero { background: linear-gradient(150deg, var(--brand) 0%, var(--brand-dark) 100%); color: #fff; border-radius: 14px; padding: 16px; margin-bottom: 12px; }

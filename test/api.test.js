@@ -122,6 +122,10 @@ test('Quét QR khi chưa đăng nhập chỉ thấy thông tin tối thiểu', a
 test('Đăng nhập bằng số điện thoại dạng +84 và OTP', async () => {
   const c = client();
   assert.equal((await c.login('0912 000 111', 'Baotri2026')).status, 200);
+  // Đăng nhập bằng mã nhân viên (không phân biệt hoa thường)
+  assert.equal((await client().login('ADMIN', 'NewAdmin2026')).status, 200);
+  assert.equal((await client().login('admin', 'NewAdmin2026')).status, 200);
+  assert.equal((await client().login('ADMIN', 'SaiMatKhau1')).status, 401);
   const o = client();
   assert.equal((await o.call('POST', '/api/auth/otp/request', { phone: '0912000111' })).status, 200);
   assert.equal((await o.call('POST', '/api/auth/otp/verify', { phone: '0912000111', code: '000000' })).status, 401);
