@@ -78,7 +78,11 @@ export default function registerAssets({ db, api, audit, config }) {
   function buildFilter(q, access) {
     const lf = locationFilter(access);
     const where = [lf.sql]; const params = [...lf.params];
-    if (q.q) { where.push('(a.asset_code ILIKE ? OR a.name ILIKE ? OR a.serial_no ILIKE ? OR a.model ILIKE ? OR a.brand ILIKE ?)'); params.push(...Array(5).fill(`%${q.q}%`)); }
+    // Tìm không dấu trên mã, tên, serial, model, hãng và người quản lý (họ tên, mã NV, SĐT); nhiều từ = phải khớp tất cả
+    if (q.q) for (const w of String(q.q).trim().split(/s+/).slice(0, 6)) {
+      where.push("sbtt_norm(concat_ws(' ', a.asset_code, a.name, a.serial_no, a.model, a.brand, u.full_name, u.employee_code, u.phone)) LIKE '%' || sbtt_norm(?) || '%'");
+      params.push(w);
+    }
     if (q.location_id) { where.push('a.location_id = ?'); params.push(Number(q.location_id)); }
     if (q.location_type) { where.push('l.type = ?'); params.push(q.location_type); }
     if (q.category_id) { where.push('a.category_id = ?'); params.push(Number(q.category_id)); }
@@ -100,7 +104,7 @@ export default function registerAssets({ db, api, audit, config }) {
     const f = buildFilter(query, access);
     const size = Math.min(500, Number(query.size) || 50), page = Math.max(1, Number(query.page) || 1);
     const sort = { code: 'a.asset_code', name: 'a.name', location: 'l.code, a.asset_code', next_mt: 'a.next_maintenance_date IS NULL, a.next_maintenance_date', updated: 'a.updated_at DESC' }[query.sort] || 'l.code, a.asset_code';
-    const total = (await db.get(`SELECT COUNT(*) n FROM assets a JOIN locations l ON l.id=a.location_id JOIN asset_categories c ON c.id=a.category_id WHERE ${f.sql}`, ...f.params)).n;
+    const total = (await db.get(`SELECT COUNT(*) n FROM assets a JOIN locations l ON l.id=a.location_id JOIN asset_categories c ON c.id=a.category_id LEFT JOIN users u ON u.id = a.custodian_user_id WHERE ${f.sql}`, ...f.params)).n;
     const rows = await db.all(`${SELECT} WHERE ${f.sql} ORDER BY ${sort} LIMIT ? OFFSET ?`, ...f.params, size, (page - 1) * size);
     return { total, page, size, items: rows.map((r) => present(r, access)) };
   });

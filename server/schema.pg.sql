@@ -6,6 +6,12 @@
 
 -- Băm mật khẩu bằng bcrypt ngay trong CSDL (Worker gói miễn phí không đủ CPU để băm)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Tìm kiếm tiếng Việt không dấu ("tra" khớp "Trà", "dong" khớp "đông")
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE OR REPLACE FUNCTION sbtt_norm(t text) RETURNS text
+LANGUAGE sql STABLE SET search_path = public, extensions AS $$
+  SELECT lower(unaccent(replace(replace(coalesce(t, ''), 'đ', 'd'), 'Đ', 'D')))
+$$;
 
 -- Hàm tương thích cú pháp SQLite: datetime('now'), datetime('now', '+14 days'), datetime('now','-10 minutes')
 CREATE OR REPLACE FUNCTION datetime(t text, modifier text DEFAULT NULL) RETURNS text

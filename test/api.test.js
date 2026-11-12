@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 // CSDL: PostgreSQL chạy trong bộ nhớ (PGlite) qua socket – cùng giao thức với Supabase, dùng đúng driver postgres.js như bản chạy thật.
 import { PGlite } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
+import { unaccent } from '@electric-sql/pglite/contrib/unaccent';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 
 // Cố định tài khoản quản trị – không phụ thuộc file .env của máy đang chạy
@@ -18,7 +19,7 @@ const { encodeQR } = await import('../server/qr.js');
 let server, base, pg, pgServer, sql;
 
 before(async () => {
-  pg = await PGlite.create({ extensions: { pgcrypto } });
+  pg = await PGlite.create({ extensions: { pgcrypto, unaccent } });
   pgServer = new PGLiteSocketServer({ db: pg, port: 0, host: '127.0.0.1' });
   await pgServer.start();
   sql = createSql(`postgres://postgres:postgres@${pgServer.getServerConn()}/postgres`, { max: 1 });
@@ -207,6 +208,15 @@ test('PostgreSQL: tổng quan, người dùng, nhật ký, sự cố, CSV lỗi 
   assert.equal((await admin.call('GET', '/api/assets?include_closed=1')).data.total, before);
   const lab = await admin.call('GET', '/print/labels?ids=' + ids.asset);
   assert.match(lab.data, /data-url="http[^"]+\/q\//);
+  // Tìm kiếm không dấu + theo người quản lý (họ tên, mã NV, SĐT)
+  assert.ok((await admin.call('GET', '/api/assets?q=' + encodeURIComponent('tu dong 500'))).data.items.some((a) => a.id === ids.asset));
+  const cht = u.data.items[0];
+  assert.equal((await admin.call('PUT', '/api/assets/' + ids.asset, { custodian_user_id: cht.id })).status, 200);
+  for (const q of ['cht 05', '0987000005', 'CHT']) {
+    const s = await admin.call('GET', '/api/assets?q=' + encodeURIComponent(q));
+    assert.ok(s.data.items.some((a) => a.id === ids.asset && a.custodian_name === 'CHT 05'), 'tìm theo người quản lý: ' + q);
+  }
+  assert.equal((await admin.call('GET', '/api/assets?q=khongcoaiten')).data.total, 0);
 });
 
 test('Bộ mã hoá QR: Reed–Solomon đúng chuẩn', () => {

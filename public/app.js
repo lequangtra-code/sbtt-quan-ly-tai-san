@@ -270,7 +270,7 @@ async function pageAssets(el) {
     ${can('asset.export') ? `<a class="btn" href="/api/assets/export.csv?${qs({ ...q, page: '' })}" download>⬇️ Xuất CSV</a>` : ''}`);
   const statusOpts = [['', 'Đang quản lý (trừ thanh lý/mất)'], ...Object.entries(STATUS).map(([k, [l]]) => [k, l])];
   el.innerHTML = `<div class="card"><form class="filters" id="flt">
-      ${field({ name: 'q', label: 'Tìm kiếm', value: q.q, placeholder: 'Mã, tên, serial, model…' })}
+      ${field({ name: 'q', label: 'Tìm kiếm', value: q.q, placeholder: 'Mã, tên, serial, người quản lý…' })}
       ${field({ name: 'location_id', label: 'Địa điểm', type: 'select', options: locOptions(), value: q.location_id })}
       ${field({ name: 'group', label: 'Nhóm', type: 'select', options: groupOptions(), value: q.group })}
       ${field({ name: 'category_id', label: 'Loại', type: 'select', options: catOptions(), value: q.category_id })}

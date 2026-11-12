@@ -3,10 +3,11 @@
 // Thêm --demo để nạp dữ liệu mẫu.
 import { PGlite } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
+import { unaccent } from '@electric-sql/pglite/contrib/unaccent';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 
 const port = Number(process.env.DEV_DB_PORT || 54329);
-const pg = await PGlite.create({ extensions: { pgcrypto } });
+const pg = await PGlite.create({ extensions: { pgcrypto, unaccent } });
 const server = new PGLiteSocketServer({ db: pg, port, host: '127.0.0.1', maxConnections: 20 });
 await server.start();
 const url = `postgres://postgres:postgres@127.0.0.1:${port}/postgres`;
