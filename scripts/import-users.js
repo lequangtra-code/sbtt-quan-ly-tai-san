@@ -1,7 +1,7 @@
 // Tạo / cập nhật tài khoản người dùng từ danh sách nhân viên (CSV: MNV, Họ và tên, Bộ phận, Vị trí, Số điện thoại, Email).
 // Cách dùng: node scripts/import-users.js <nhanvien.csv> [--commit]
 //   Không có --commit: chỉ kiểm tra và in kế hoạch. Có --commit: tạo tài khoản qua API /api/users (đúng quy tắc phân quyền),
-//   mật khẩu tạm của tài khoản mới được ghi ra data/mat-khau-tam-<ngày>.csv (thư mục data/ không đưa lên GitHub).
+//   mật khẩu tạm của tài khoản mới = MÃ NHÂN VIÊN (bắt buộc đổi ở lần đăng nhập đầu); danh sách ghi ra data/tai-khoan-moi-<ngày>.csv.
 // Nhân viên đã có tài khoản (trùng mã NV) được cập nhật họ tên, chức danh, phạm vi – KHÔNG đổi mật khẩu.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -100,7 +100,7 @@ try {
     ({ server } = createApp({ serveStatic: false }));
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const port = server.address().port, cookie = 'sbtt_sid=' + token;
-    const out = [['MNV', 'Họ và tên', 'Chức danh', 'Phạm vi', 'Đăng nhập bằng', 'Mật khẩu tạm']];
+    const out = [['MNV', 'Họ và tên', 'Chức danh', 'Phạm vi', 'Tên đăng nhập', 'Mật khẩu tạm']];
     let created = 0, updated = 0;
     for (const p of people) {
       const body = { employee_code: p.code, full_name: p.name, email: p.email, phone: p.phone, role_id: p.roleId, department: p.dept,
@@ -111,12 +111,15 @@ try {
       }
       const r = p.target ? await post(port, 'PUT', `/api/users/${p.target.id}`, cookie, body) : await post(port, 'POST', '/api/users', cookie, body);
       if (r.status !== 200) { console.log(`  ✖ ${p.code} ${p.name}: ${r.json.error}`); process.exitCode = 1; continue; }
-      if (p.target) updated++; else created++;
-      if (r.json.temp_password) out.push([p.code, p.name, p.role, p.all ? 'Toàn hệ thống' : p.locs.join(' '), p.email || p.phone, r.json.temp_password]);
+      if (p.target) { updated++; continue; }
+      created++;
+      // Mật khẩu tạm = mã nhân viên (theo quy định công ty)
+      await db.run("UPDATE users SET password_hash = sbtt_hash_password(?), must_change_password = 1 WHERE id = ?", p.code, r.json.id);
+      out.push([p.code, p.name, p.role, p.all ? 'Toàn hệ thống' : p.locs.join(' '), p.code, p.code]);
     }
-    const outFile = path.join(ROOT, 'data', `mat-khau-tam-${new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)}.csv`);
+    const outFile = path.join(ROOT, 'data', `tai-khoan-moi-${new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)}.csv`);
     fs.writeFileSync(outFile, toCsv(out));
-    console.log(`Đã tạo ${created}, cập nhật ${updated}. Mật khẩu tạm: ${outFile}`);
+    console.log(`Đã tạo ${created}, cập nhật ${updated}. Danh sách: ${outFile}`);
   }
 } finally {
   await db.run('DELETE FROM sessions WHERE token_hash = ?', sha256(token)).catch(() => {});
