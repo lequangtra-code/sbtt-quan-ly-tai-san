@@ -18,13 +18,15 @@
   // Tạo bằng: npx wrangler hyperdrive create taisan-db --connection-string="postgresql://..."
   // rồi dán ID nhận được vào đây.
   "hyperdrive": [
-    { "binding": "HYPERDRIVE", "id": "THAY_BANG_HYPERDRIVE_ID" }
+    { "binding": "HYPERDRIVE", "id": "f19f91c53bcf44d7974f3b76dd541cc4" }
   ],
 
-  // Tên miền riêng (soibien.vn phải đang dùng DNS của Cloudflare)
-  "routes": [
-    { "pattern": "taisan.soibien.vn", "custom_domain": true }
-  ],
+  // Tên miền riêng: soibien.vn phải nằm trong CÙNG tài khoản Cloudflare với Worker.
+  // Hiện soibien.vn thuộc tài khoản Cloudflare khác -> tạm chạy ở *.workers.dev. Khi có quyền, bỏ // 3 dòng dưới.
+  // "routes": [
+  //   { "pattern": "taisan.soibien.vn", "custom_domain": true }
+  // ],
+  "workers_dev": true,
 
   // Cấu hình không bí mật. Thông tin bí mật (ADMIN_PASSWORD, GOOGLE_CLIENT_SECRET, SMS_WEBHOOK_TOKEN...)
   // khai báo bằng: npx wrangler secret put TEN_BIEN  (hoặc trên Dashboard → Settings → Variables and Secrets)
