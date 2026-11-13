@@ -1,8 +1,13 @@
 import { normalizePhone } from '../db.js';
-import { validatePassword, randomToken, sha256, randomDigits, rateLimit, resetRate } from '../security.js';
+import { validatePassword, randomToken, sha256, randomDigits } from '../security.js';
 import { HttpError, bad, setCookie } from '../http.js';
 
+/** Chỉ cho phép chuyển hướng nội bộ: "/..." nhưng không phải "//..." hay "/\..." (trình duyệt hiểu là trang ngoài) */
+export const safeNext = (n) => (typeof n === 'string' && /^\/(?![/\\])/.test(n) && !/[\r\n\t]/.test(n) ? n : '/');
+
 export default function registerAuth({ db, api, audit, config }) {
+  // OTP chỉ bật khi đã cấu hình nhà cung cấp SMS (hoặc khi chạy thử trên máy)
+  const otpOn = (config.smsProvider === 'webhook' && !!config.smsWebhookUrl) || !config.production;
   const findByIdentifier = async (identifier) => {
     const id = String(identifier || '').trim();
     if (id.includes('@')) return db.get('SELECT * FROM users WHERE email = ?', id.toLowerCase());
@@ -17,6 +22,9 @@ export default function registerAuth({ db, api, audit, config }) {
     await db.run(`INSERT INTO sessions(token_hash, user_id, expires_at, ip, user_agent, method) VALUES (?,?,datetime('now', ?),?,?,?)`,
       sha256(token), user.id, `+${days} days`, ctx.ip, String(ctx.req.headers['user-agent'] || '').slice(0, 250), method);
     await db.run("UPDATE users SET last_login_at = datetime('now') WHERE id = ?", user.id);
+    // Dọn phiên & bộ đếm hết hạn
+    await db.run("DELETE FROM sessions WHERE expires_at <= datetime('now')");
+    await db.run("DELETE FROM rate_limits WHERE reset_at <= datetime('now')");
     setCookie(ctx.res, 'sbtt_sid', token, { maxAge: days * 86400, secure: config.production });
     ctx.access = { user };
     await audit(ctx, 'login', 'user', user.id, { method });
@@ -26,7 +34,7 @@ export default function registerAuth({ db, api, audit, config }) {
     companyName: config.companyName,
     companyShort: config.companyShort,
     googleEnabled: !!(config.googleClientId && config.googleClientSecret),
-    otpEnabled: true,
+    otpEnabled: otpOn,
     hotline: config.maintenanceHotline,
   }));
 
@@ -35,23 +43,24 @@ export default function registerAuth({ db, api, audit, config }) {
     const { identifier, password } = ctx.body;
     if (!identifier || !password) throw bad('Vui lòng nhập email/số điện thoại và mật khẩu');
     const key = 'login:' + String(identifier).toLowerCase();
-    if (!rateLimit(key, 8, 15 * 60e3) || !rateLimit('loginip:' + ctx.ip, 50, 15 * 60e3)) throw new HttpError(429, 'Đăng nhập sai quá nhiều lần, thử lại sau 15 phút');
+    if (!(await db.rateLimit(key, 8, 900)) || !(await db.rateLimit('loginip:' + ctx.ip, 50, 900))) throw new HttpError(429, 'Đăng nhập sai quá nhiều lần, thử lại sau 15 phút');
     const user = await findByIdentifier(identifier);
     if (!user || !(await db.verifyPassword(password, user.password_hash))) {
       await audit(ctx, 'login_failed', 'user', user?.id, { identifier: String(identifier).slice(0, 80) });
       throw new HttpError(401, 'Thông tin đăng nhập không đúng');
     }
     if (user.status !== 'active') throw new HttpError(403, 'Tài khoản đã bị khoá');
-    resetRate(key);
+    await db.resetRate(key);
     await startSession(ctx, user, 'password');
     return { ok: true, mustChangePassword: !!user.must_change_password };
   });
 
   // OTP qua SMS cho số điện thoại
   api.post('/api/auth/otp/request', null, async (ctx) => {
+    if (!otpOn) throw new HttpError(404, 'Chưa bật đăng nhập bằng OTP');
     const phone = normalizePhone(ctx.body.phone);
     if (!phone) throw bad('Số điện thoại không hợp lệ');
-    if (!rateLimit('otp:' + phone, 3, 10 * 60e3) || !rateLimit('otpip:' + ctx.ip, 20, 60 * 60e3)) throw new HttpError(429, 'Bạn đã yêu cầu quá nhiều mã, thử lại sau');
+    if (!(await db.rateLimit('otp:' + phone, 3, 600)) || !(await db.rateLimit('otpip:' + ctx.ip, 20, 3600))) throw new HttpError(429, 'Bạn đã yêu cầu quá nhiều mã, thử lại sau');
     const user = await db.get("SELECT * FROM users WHERE phone = ? AND status='active'", phone);
     // Không tiết lộ số điện thoại có tồn tại hay không
     if (user) {
@@ -65,6 +74,7 @@ export default function registerAuth({ db, api, audit, config }) {
   });
 
   api.post('/api/auth/otp/verify', null, async (ctx) => {
+    if (!otpOn) throw new HttpError(404, 'Chưa bật đăng nhập bằng OTP');
     const phone = normalizePhone(ctx.body.phone);
     const code = String(ctx.body.code || '').trim();
     const row = phone && await db.get("SELECT * FROM otp_codes WHERE phone = ? AND expires_at > datetime('now')", phone);
@@ -88,8 +98,10 @@ export default function registerAuth({ db, api, audit, config }) {
 
   api.get('/api/auth/me', 'auth', (ctx) => {
     const { user, perms, allLocations, locationIds } = ctx.access;
+    const pending = !!user.must_change_password; // chưa kích hoạt: không trả SĐT/email (dùng để xác minh khi đổi mật khẩu)
     return {
-      user: { id: user.id, full_name: user.full_name, email: user.email, phone: user.phone, employee_code: user.employee_code,
+      user: { id: user.id, full_name: user.full_name, email: pending ? null : user.email, phone: pending ? null : user.phone, employee_code: user.employee_code,
+        verify_phone: pending && !!user.phone,
         role_code: user.role_code, role_name: user.role_name, department: user.department, must_change_password: !!user.must_change_password },
       permissions: [...perms], allLocations, locationIds,
     };
@@ -98,12 +110,21 @@ export default function registerAuth({ db, api, audit, config }) {
   api.post('/api/auth/change-password', 'auth', async (ctx) => {
     const { current, next } = ctx.body;
     const user = await db.get('SELECT * FROM users WHERE id = ?', ctx.access.user.id);
+    if (!(await db.rateLimit('pwchange:' + user.id, 10, 900))) throw new HttpError(429, 'Thử quá nhiều lần, vui lòng đợi 15 phút');
     if (user.password_hash && !(await db.verifyPassword(current || '', user.password_hash))) throw bad('Mật khẩu hiện tại không đúng');
+    // Kích hoạt lần đầu: phải xác nhận đúng SĐT đã đăng ký (mật khẩu tạm có thể đoán được)
+    if (user.must_change_password && user.phone && normalizePhone(ctx.body.phone_confirm) !== user.phone) {
+      await audit(ctx, 'activate_failed', 'user', user.id);
+      throw bad('Số điện thoại xác nhận không đúng với số đã đăng ký');
+    }
     const err = validatePassword(next);
     if (err) throw bad(err);
+    if (String(next) === String(current) || (user.employee_code && String(next).toUpperCase() === user.employee_code.toUpperCase()))
+      throw bad('Mật khẩu mới phải khác mật khẩu hiện tại và khác mã nhân viên');
     await db.run("UPDATE users SET password_hash = sbtt_hash_password(?), must_change_password = 0, updated_at = datetime('now') WHERE id = ?", String(next), user.id);
     // Đăng xuất các phiên khác
     await db.run('DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?', user.id, sha256(ctx.cookies.sbtt_sid || ''));
+    await db.resetRate('pwchange:' + user.id);
     await audit(ctx, 'change_password', 'user', user.id);
     return { ok: true };
   });
@@ -113,7 +134,7 @@ export default function registerAuth({ db, api, audit, config }) {
   api.get('/auth/google', null, (ctx) => {
     if (!config.googleClientId) throw bad('Chưa cấu hình đăng nhập Google');
     const state = randomToken(16);
-    setCookie(ctx.res, 'sbtt_gstate', state + '|' + (ctx.query.next || '/'), { maxAge: 600, secure: config.production });
+    setCookie(ctx.res, 'sbtt_gstate', state + '|' + safeNext(ctx.query.next), { maxAge: 600, secure: config.production });
     const qs = new URLSearchParams({ client_id: config.googleClientId, redirect_uri: redirectUri(), response_type: 'code',
       scope: 'openid email profile', state, prompt: 'select_account' });
     ctx.res.writeHead(302, { Location: 'https://accounts.google.com/o/oauth2/v2/auth?' + qs });
@@ -123,7 +144,7 @@ export default function registerAuth({ db, api, audit, config }) {
   api.get('/auth/google/callback', null, async (ctx) => {
     const fail = (msg) => { ctx.res.writeHead(302, { Location: '/login?error=' + encodeURIComponent(msg) }); ctx.res.end(); };
     const [state, next = '/'] = String(ctx.cookies.sbtt_gstate || '').split('|');
-    setCookie(ctx.res, 'sbtt_gstate', '', { maxAge: 0 });
+    setCookie(ctx.res, 'sbtt_gstate', '', { maxAge: 0, secure: config.production });
     if (!state || state !== ctx.query.state || !ctx.query.code) return fail('Phiên đăng nhập Google không hợp lệ');
     const r = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -145,7 +166,7 @@ export default function registerAuth({ db, api, audit, config }) {
     // Đăng nhập bằng Google không cần đổi mật khẩu lần đầu
     await db.run('UPDATE users SET must_change_password = 0 WHERE id = ? AND password_hash IS NULL', user.id);
     await startSession(ctx, user, 'google');
-    ctx.res.writeHead(302, { Location: next.startsWith('/') && !next.startsWith('//') ? next : '/' });
+    ctx.res.writeHead(302, { Location: safeNext(next) });
     ctx.res.end();
   });
 }

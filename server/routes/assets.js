@@ -283,15 +283,12 @@ export default function registerAssets({ db, api, audit, config }) {
   @media print { .bar { display: none; } .sheet { padding: 0; } }
 </style></head><body>
 <div class="bar"><b>${rows.length} nhãn</b> · Khổ ${size[0]}×${size[1]} mm
-  <button onclick="window.print()">🖨️ In nhãn</button>
+  <button id="btn-print" type="button">🖨️ In nhãn</button>
   <span>Khổ nhãn: <a style="color:#fff" href="?${esc(new URLSearchParams({ ...ctx.query, size: 's' }))}">50×30</a> ·
   <a style="color:#fff" href="?${esc(new URLSearchParams({ ...ctx.query, size: 'm' }))}">70×50</a> ·
   <a style="color:#fff" href="?${esc(new URLSearchParams({ ...ctx.query, size: 'l' }))}">100×70</a></span></div>
 <div class="sheet">${labels || '<p>Không có tài sản phù hợp.</p>'}</div>
-<script type="module">
-  import { qrSvg } from '/qr.js';
-  for (const el of document.querySelectorAll('.qr[data-url]')) el.innerHTML = qrSvg(el.dataset.url, { ecl: 'Q', scale: 3 });
-</script></body></html>`);
+<script type="module" src="/print-labels.js"></script></body></html>`);
   });
 
   // ---- Nhập / xuất CSV ----

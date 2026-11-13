@@ -244,12 +244,31 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT
 );
 
+-- Giới hạn số lần thử (đăng nhập, OTP) dùng chung cho mọi Worker/tiến trình
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key       TEXT PRIMARY KEY,
+  n         INTEGER NOT NULL,
+  reset_at  TEXT NOT NULL
+);
+
 -- Supabase: chặn truy cập trực tiếp qua API REST công khai (ứng dụng kết nối bằng tài khoản postgres qua Hyperdrive)
 DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY['locations','permissions','roles','role_permissions','users','user_locations','user_permission_overrides',
-    'sessions','otp_codes','asset_categories','assets','incidents','maintenance_records','transfers','audit_logs','settings'] LOOP
+    'sessions','otp_codes','asset_categories','assets','incidents','maintenance_records','transfers','audit_logs','settings','rate_limits'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+  END LOOP;
+END $$;
+
+-- Supabase: không cho gọi các hàm của ứng dụng qua API công khai (PostgREST /rpc) bằng khoá anon/authenticated
+DO $$
+DECLARE f text; r text;
+BEGIN
+  FOREACH f IN ARRAY ARRAY['datetime(text, text)', 'sbtt_hash_password(text)', 'sbtt_check_password(text, text)', 'sbtt_norm(text)'] LOOP
+    EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC', f);
+    FOREACH r IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM %I', f, r); END IF;
+    END LOOP;
   END LOOP;
 END $$;

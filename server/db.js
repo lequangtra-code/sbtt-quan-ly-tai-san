@@ -64,6 +64,16 @@ export const db = {
     return { changes: r.count, lastInsertRowid: r[0]?.id ?? null };
   },
   async exec(text) { const { sql } = current(); return sql.unsafe(text); },
+  /** Đếm 1 lần thử cho key trong cửa sổ windowSec giây (lưu trong CSDL – đúng cả khi nhiều Worker). Trả về true nếu còn trong giới hạn. */
+  async rateLimit(key, max, windowSec) {
+    const r = await db.get(`INSERT INTO rate_limits(key, n, reset_at) VALUES (?, 1, datetime('now', ?))
+      ON CONFLICT(key) DO UPDATE SET
+        n = CASE WHEN rate_limits.reset_at <= datetime('now') THEN 1 ELSE rate_limits.n + 1 END,
+        reset_at = CASE WHEN rate_limits.reset_at <= datetime('now') THEN excluded.reset_at ELSE rate_limits.reset_at END
+      RETURNING n`, String(key).slice(0, 200), `+${Math.round(windowSec)} seconds`);
+    return r.n <= max;
+  },
+  resetRate: (key) => db.run('DELETE FROM rate_limits WHERE key = ?', String(key).slice(0, 200)),
   hashPassword: async (pw) => (await db.get('SELECT sbtt_hash_password(?) AS h', String(pw))).h,
   verifyPassword: async (pw, stored) => !!stored && (await db.get('SELECT sbtt_check_password(?, ?) AS ok', String(pw), stored)).ok,
 };

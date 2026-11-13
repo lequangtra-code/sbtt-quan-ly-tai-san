@@ -20,7 +20,14 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
  *        Bỏ trống = dùng kết nối mặc định (Node.js).
  * @param {boolean} [opts.serveStatic=true]  Phục vụ thư mục public/ (Workers dùng Static Assets nên tắt).
  */
-export function createApp({ connect, serveStatic = true } = {}) {
+// CSP cho trang HTML do máy chủ tạo (in nhãn) và cho JSON: chỉ chạy script/style của chính website
+const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'";
+
+/**
+ * @param {boolean} [opts.behindCloudflare=false]  true = chạy trên Workers: IP người dùng lấy từ CF-Connecting-IP (không giả mạo được).
+ *        Khi chạy Node sau proxy (Caddy), đặt TRUST_PROXY=true để đọc X-Forwarded-For; mặc định dùng IP kết nối.
+ */
+export function createApp({ connect, serveStatic = true, behindCloudflare = false } = {}) {
   const router = createRouter();
 
   const audit = (ctx, action, entity, entityId, detail) =>
@@ -50,10 +57,18 @@ export function createApp({ connect, serveStatic = true } = {}) {
 
   async function handle(req, res) {
     const url = new URL(req.url, 'http://x');
-    const ip = req.headers['cf-connecting-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress;
+    const ip = behindCloudflare ? (req.headers['cf-connecting-ip'] || 'unknown')
+      : (process.env.TRUST_PROXY === 'true' && (req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket?.remoteAddress || 'unknown';
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Content-Security-Policy', CSP);
+    if (config.production) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    // Trên Cloudflare: không phục vụ API qua http:// (cookie phiên có thể bị nghe lén)
+    if (behindCloudflare && (req.headers['x-forwarded-proto'] === 'http' || /"scheme":"http"/.test(req.headers['cf-visitor'] || ''))) {
+      res.writeHead(301, { Location: 'https://' + (req.headers.host || '') + req.url });
+      return res.end();
+    }
     try {
       const isApi = url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/') || url.pathname.startsWith('/print/');
       if (isApi) {

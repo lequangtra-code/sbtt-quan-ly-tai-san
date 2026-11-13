@@ -105,7 +105,9 @@ export function parseCsv(text) {
 
 export function toCsv(rows) {
   return '﻿' + rows.map((r) => r.map((v) => {
-    const s = v === null || v === undefined ? '' : String(v);
+    let s = v === null || v === undefined ? '' : String(v);
+    // Chống chèn công thức khi mở bằng Excel/Sheets (ô văn bản bắt đầu bằng = + - @ tab CR)
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
     return /[",\n\r;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   }).join(',')).join('\r\n');
 }

@@ -113,7 +113,13 @@ Mở `http://localhost:8787`, đăng nhập **tp.baotri.demo@gmail.com / Demo@20
 | Số điện thoại + **OTP SMS** | Mã 6 số, hiệu lực 5 phút, tối đa 5 lần nhập sai, giới hạn 3 lần gửi/10 phút |
 | **Đăng nhập Google** | Bật khi khai báo `GOOGLE_CLIENT_ID/SECRET`; chỉ email đã được cấp tài khoản mới vào được |
 
-Bảo mật: mật khẩu băm `scrypt`; phiên lưu trong CSDL (cookie HttpOnly, SameSite, Secure khi production); chống dò mật khẩu (8 lần/15 phút); chống CSRF bằng header `X-SBTT`; khoá tài khoản là thu hồi mọi phiên ngay.
+**Bảo mật**
+- Mật khẩu băm bcrypt trong PostgreSQL (`pgcrypto`); phiên lưu trong CSDL, cookie HttpOnly + SameSite + Secure (production); khoá tài khoản = thu hồi mọi phiên ngay.
+- **Mật khẩu tạm = mã nhân viên** → lần đăng nhập đầu phải **xác nhận đúng SĐT đã đăng ký** mới đặt được mật khẩu mới; tài khoản chưa kích hoạt không xem được dữ liệu nào (kể cả danh sách người dùng) và mật khẩu mới không được trùng mã NV.
+- Chống dò mật khẩu: 8 lần/15 phút theo tài khoản, 50 lần/15 phút theo IP – bộ đếm lưu trong CSDL (bảng `rate_limits`), đúng cả khi chạy nhiều Worker.
+- Chống CSRF bằng header `X-SBTT` (không mở CORS); CSP chỉ cho chạy script của chính website; HSTS; API qua http:// tự chuyển sang https://.
+- Supabase: bật RLS mọi bảng, thu hồi quyền gọi hàm của khoá anon/authenticated; Hyperdrive **tắt cache** (khoá tài khoản/đăng xuất có hiệu lực ngay).
+- SĐT người dùng chỉ trả cho người có quyền `user.view`; xuất CSV chống chèn công thức Excel; OTP tự tắt khi chưa cấu hình nhà cung cấp SMS.
 
 ### Cấu hình Google Sign-In
 1. Google Cloud Console → *APIs & Services* → *Credentials* → *Create OAuth client ID* → loại **Web application**.

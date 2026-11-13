@@ -182,7 +182,8 @@ function pageNotFound(el) { el.innerHTML = '<div class="empty">Không tìm thấ
 // ---------------- Đăng nhập ----------------
 async function pageLogin(el) {
   const p = new URLSearchParams(location.search);
-  const next = p.get('next') || '/';
+  const rawNext = p.get('next') || '/';
+  const next = /^\/(?![/\\])/.test(rawNext) ? rawNext : '/'; // chỉ chuyển trong website
   if (S.me && !S.me.must_change_password) return go(next);
   el.innerHTML = `<div class="login-wrap"><div class="login login-v2">
     <div class="login-tile"><img class="mark" src="/brand/logo-mark-white.png" alt=""><img class="text" src="/brand/logo-text-white.png" alt="Sói Biển"></div>
@@ -218,7 +219,8 @@ async function pageChangePw(el) {
   const forced = S.me.must_change_password;
   el.innerHTML = `<div class="login-wrap"><div class="login"><div class="logo"><img src="/brand/icon-192.png" alt=""><div><b>Đổi mật khẩu</b><small>${esc(S.me.full_name)}</small></div></div>
     ${forced ? '<div class="alert warn">Đây là lần đăng nhập đầu tiên hoặc mật khẩu vừa được đặt lại. Vui lòng đặt mật khẩu mới.</div>' : ''}
-    <form class="stack">${field({ name: 'current', label: 'Mật khẩu hiện tại', type: 'password', attrs: 'autocomplete="current-password"' })}
+    <form class="stack">${field({ name: 'current', label: forced ? 'Mật khẩu hiện tại (mật khẩu tạm)' : 'Mật khẩu hiện tại', type: 'password', attrs: 'autocomplete="current-password"' })}
+    ${S.me.verify_phone ? field({ name: 'phone_confirm', label: 'Số điện thoại đã đăng ký với công ty (để xác minh chính chủ)', placeholder: '09xxxxxxxx', attrs: 'inputmode="tel" autocomplete="tel" required' }) : ''}
     ${field({ name: 'next', label: 'Mật khẩu mới (≥ 8 ký tự, có chữ và số)', type: 'password', attrs: 'autocomplete="new-password" required' })}
     ${field({ name: 'next2', label: 'Nhập lại mật khẩu mới', type: 'password', attrs: 'autocomplete="new-password" required' })}
     <button class="btn primary">Lưu mật khẩu</button>${forced ? '' : '<a class="btn" href="/" style="margin-top:8px">Quay lại</a>'}</form></div></div>`;
@@ -557,7 +559,8 @@ async function pageMaintenance(el) {
     };
     box.innerHTML = `<div class="card no-print"><form class="row" id="f">${field({ name: 'year', label: 'Năm', type: 'select', value: y, options: [y - 1, y, y + 1].map((x) => [x, x]) })}
       ${field({ name: 'location_id', label: 'Địa điểm', type: 'select', options: locOptions() })}${field({ name: 'group', label: 'Nhóm', type: 'select', options: groupOptions() })}
-      <button type="button" class="btn" onclick="window.print()" style="margin-top:18px">🖨️ In kế hoạch</button></form></div><div class="card flush" id="res"></div>`;
+      <button type="button" class="btn" id="btn-print-plan" style="margin-top:18px">🖨️ In kế hoạch</button></form></div><div class="card flush" id="res"></div>`;
+    $('#btn-print-plan', box).onclick = () => window.print();
     $('#f', box).onchange = (e) => draw(readForm(e.currentTarget));
     return draw({ year: y });
   }

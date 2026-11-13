@@ -1,7 +1,7 @@
 import { tx, normalizePhone } from '../db.js';
 import { can, loadAccess, ALL_PERMISSION_CODES } from '../rbac.js';
 import { validatePassword, randomToken } from '../security.js';
-import { bad, forbidden, notFound } from '../http.js';
+import { bad, forbidden, notFound, HttpError } from '../http.js';
 
 const LOC_TYPES = { office: 'Văn phòng', warehouse: 'Kho tổng', warehouse_it: 'Kho IT', warehouse_admin: 'Kho hành chính', store: 'Cửa hàng' };
 const tempPassword = () => 'Sb' + randomToken(6).replace(/[^A-Za-z0-9]/g, 'x') + Math.floor(Math.random() * 90 + 10);
@@ -12,11 +12,14 @@ export default function registerAdmin({ db, api, audit }) {
   api.get('/api/permissions', 'auth', async () => ({ items: await db.all('SELECT * FROM permissions ORDER BY sort') }));
 
   api.get('/api/lookups', 'auth', async ({ access }) => {
+    // Tài khoản chưa kích hoạt (mật khẩu tạm) không được xem danh mục người dùng/địa điểm
+    if (access.user.must_change_password) throw new HttpError(403, 'Bạn cần đổi mật khẩu trước khi sử dụng', { mustChangePassword: true });
+    const showPhone = can(access, 'user.view');
     const needUsers = ['asset.create', 'asset.update', 'transfer.request', 'incident.manage', 'user.view'].some((p) => can(access, p));
     const [locs, categories, users] = await Promise.all([
       db.all('SELECT id, code, name, type, region, active FROM locations ORDER BY CASE type WHEN \'store\' THEN 1 ELSE 0 END, code'),
       db.all('SELECT * FROM asset_categories ORDER BY grp, name'),
-      needUsers ? db.all(`SELECT u.id, u.full_name, u.phone, u.employee_code, r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.status='active' ORDER BY u.full_name`) : [],
+      needUsers ? db.all(`SELECT u.id, u.full_name, ${showPhone ? 'u.phone' : 'NULL AS phone'}, u.employee_code, r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.status='active' ORDER BY u.full_name`) : [],
     ]);
     const locations = locs.map((l) => ({ ...l, in_scope: access.allLocations || access.locationIds.includes(l.id) }));
     return { locations, categories, users, location_types: LOC_TYPES };

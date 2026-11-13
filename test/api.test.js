@@ -8,6 +8,8 @@ import { unaccent } from '@electric-sql/pglite/contrib/unaccent';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 
 // Cố định tài khoản quản trị – không phụ thuộc file .env của máy đang chạy
+process.env.NODE_ENV = 'test'; // không dùng chế độ production của file .env (OTP thử, cookie không Secure)
+process.env.SMS_PROVIDER = 'console';
 process.env.ADMIN_EMAIL = 'admin@soibien.vn';
 process.env.ADMIN_PHONE = '0900000000';
 process.env.ADMIN_PASSWORD = 'Admin@2026x';
@@ -49,9 +51,17 @@ test('Quản trị đăng nhập lần đầu phải đổi mật khẩu', async
   const r = await admin.login('admin@soibien.vn', 'Admin@2026x');
   assert.equal(r.status, 200); assert.equal(r.data.mustChangePassword, true);
   assert.equal((await admin.call('GET', '/api/assets')).status, 403);
-  assert.equal((await admin.call('POST', '/api/auth/change-password', { current: 'Admin@2026x', next: 'abc' })).status, 400);
-  assert.equal((await admin.call('POST', '/api/auth/change-password', { current: 'Admin@2026x', next: 'NewAdmin2026' })).status, 200);
+  // Chưa kích hoạt: không xem được danh mục người dùng, /me không lộ SĐT/email
+  assert.equal((await admin.call('GET', '/api/lookups')).status, 403);
+  const me = (await admin.call('GET', '/api/auth/me')).data;
+  assert.equal(me.user.phone, null); assert.equal(me.user.email, null); assert.equal(me.user.verify_phone, true);
+  assert.equal((await admin.call('POST', '/api/auth/change-password', { current: 'Admin@2026x', next: 'abc', phone_confirm: '0900000000' })).status, 400);
+  // Sai SĐT xác nhận -> từ chối dù đúng mật khẩu tạm
+  const wrong = await admin.call('POST', '/api/auth/change-password', { current: 'Admin@2026x', next: 'NewAdmin2026', phone_confirm: '0911111111' });
+  assert.equal(wrong.status, 400); assert.match(wrong.data.error, /Số điện thoại/);
+  assert.equal((await admin.call('POST', '/api/auth/change-password', { current: 'Admin@2026x', next: 'NewAdmin2026', phone_confirm: '0900000000' })).status, 200);
   assert.equal((await admin.call('GET', '/api/assets')).status, 200);
+  assert.equal((await admin.call('GET', '/api/lookups')).status, 200);
 });
 
 test('Địa điểm thật: K00–K04 và 37 cửa hàng đang hoạt động', async () => {
@@ -97,7 +107,7 @@ test('Tạo tài sản, sinh mã & QR', async () => {
 test('Cửa hàng trưởng chỉ thấy tài sản cửa hàng mình, không thấy giá', async () => {
   const c = client();
   await c.login('0987000005', ids.chtPw);
-  await c.call('POST', '/api/auth/change-password', { current: ids.chtPw, next: 'Cht052026' });
+  await c.call('POST', '/api/auth/change-password', { current: ids.chtPw, next: 'Cht052026', phone_confirm: '0987000005' });
   const { data } = await c.call('GET', '/api/assets');
   assert.equal(data.total, 1);
   assert.equal(data.items[0].location_code, 'S08');
@@ -137,7 +147,7 @@ test('Phân quyền theo nhóm trường: kế toán sửa giá, bảo trì khô
   await kt.call('POST', '/api/auth/change-password', { current: 'Ketoan2026', next: 'Ketoan2027' });
   assert.equal((await kt.call('PUT', '/api/assets/' + ids.asset, { original_cost: 15000000, useful_life_months: 36 })).status, 200);
   const bt = client(); await bt.login('0912000111', 'Baotri2026');
-  await bt.call('POST', '/api/auth/change-password', { current: 'Baotri2026', next: 'Baotri2027' });
+  await bt.call('POST', '/api/auth/change-password', { current: 'Baotri2026', next: 'Baotri2027', phone_confirm: '+84 912 000 111' });
   assert.equal((await bt.call('PUT', '/api/assets/' + ids.asset, { original_cost: 1 })).status, 403);
   const d = await bt.call('GET', '/api/assets/' + ids.asset);
   assert.ok(!('original_cost' in d.data.asset));
@@ -217,6 +227,33 @@ test('PostgreSQL: tổng quan, người dùng, nhật ký, sự cố, CSV lỗi 
     assert.ok(s.data.items.some((a) => a.id === ids.asset && a.custodian_name === 'CHT 05'), 'tìm theo người quản lý: ' + q);
   }
   assert.equal((await admin.call('GET', '/api/assets?q=khongcoaiten')).data.total, 0);
+});
+
+test('Bảo mật: khoá dò mật khẩu, mật khẩu mới ≠ mã NV, CSV chống chèn công thức, header CSP, người nhận hợp lệ', async () => {
+  // Mật khẩu tạm = mã NV: không được đặt lại mật khẩu mới trùng mã NV
+  const nv = await admin.call('POST', '/api/users', { full_name: 'NV Bảo mật', employee_code: 'S9001', phone: '0987009001', role_id: ids.role.NV_CH, all_locations: true });
+  assert.equal(nv.status, 200);
+  const c = client();
+  assert.equal((await c.login('s9001', nv.data.temp_password)).status, 200);
+  const same = await c.call('POST', '/api/auth/change-password', { current: nv.data.temp_password, next: 'S9001abc1', phone_confirm: '0987009001' });
+  assert.equal(same.status, 200, 'mật khẩu khác mã NV vẫn được'); // khác mã NV -> hợp lệ
+  // Dò mật khẩu: sai 8 lần -> lần 9 bị khoá (bộ đếm lưu trong CSDL)
+  const x = client();
+  for (let i = 0; i < 8; i++) assert.equal((await x.login('S9001', 'SaiMatKhau' + i)).status, 401);
+  assert.equal((await x.login('S9001', 'S9001abc1')).status, 429);
+  // CSV: tên bắt đầu bằng "=" bị vô hiệu hoá khi xuất
+  const { data: lk } = await admin.call('GET', '/api/lookups');
+  const evil = await admin.call('POST', '/api/assets', { name: '=HYPERLINK("http://evil")', category_id: lk.categories[0].id, location_id: ids.loc.S20 });
+  assert.equal(evil.status, 200);
+  assert.match((await admin.call('GET', '/api/assets/export.csv?q=hyperlink')).data, /"'=HYPERLINK/);
+  // Header bảo mật trên API
+  const r = await fetch(base + '/api/public/config');
+  assert.match(r.headers.get('content-security-policy') || '', /script-src 'self'/);
+  // Điều chuyển cho người nhận không tồn tại -> từ chối
+  assert.equal((await admin.call('POST', `/api/assets/${evil.data.asset.id}/transfers`, { to_location_id: ids.loc.S08, to_custodian_id: 999999 })).status, 400);
+  // Header IP giả mạo không làm sai bộ đếm (chạy Node: không tin CF-Connecting-IP)
+  const spoof = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-SBTT': '1', 'CF-Connecting-IP': '1.2.3.4' }, body: JSON.stringify({ identifier: 'S9001', password: 'x' }) });
+  assert.equal(spoof.status, 429);
 });
 
 test('Bộ mã hoá QR: Reed–Solomon đúng chuẩn', () => {

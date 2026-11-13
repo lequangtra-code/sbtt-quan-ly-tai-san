@@ -13,6 +13,7 @@ const { createApp } = await import('./app.js');
 
 const { server } = createApp({
   serveStatic: false,
+  behindCloudflare: true,
   connect() {
     // 1 kết nối / request: các truy vấn song song được gửi nối tiếp (pipelining) trên cùng kết nối
     const sql = createSql(env.HYPERDRIVE.connectionString, { max: 1 });

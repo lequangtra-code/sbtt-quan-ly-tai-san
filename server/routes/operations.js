@@ -156,6 +156,7 @@ export default function registerOps({ db, api, audit }) {
     if (to.id === a.location_id && !ctx.body.to_custodian_id) throw bad('Địa điểm nhận trùng địa điểm hiện tại');
     if (await db.get("SELECT 1 AS x FROM transfers WHERE asset_id = ? AND status = 'pending'", a.id)) throw bad('Tài sản đang có đề nghị điều chuyển chờ duyệt');
     const toCust = intOrNull(ctx.body.to_custodian_id);
+    if (ctx.body.to_custodian_id && !(toCust && await db.get("SELECT 1 AS x FROM users WHERE id = ? AND status = 'active'", toCust))) throw bad('Người nhận tài sản không hợp lệ');
     return tx(db, async () => {
       const { lastInsertRowid } = await db.run(`INSERT INTO transfers(asset_id, from_location_id, to_location_id, from_custodian_id, to_custodian_id, reason, requested_by)
         VALUES (?,?,?,?,?,?,?)`, a.id, a.location_id, to.id, a.custodian_user_id, toCust, ctx.body.reason || null, ctx.access.user.id);
@@ -232,7 +233,10 @@ export default function registerOps({ db, api, audit }) {
     if (can(access, 'incident.view') || can(access, 'incident.manage'))
       out.incidents_open = (await db.get(`SELECT COUNT(*) n FROM incidents i JOIN assets a ON a.id=i.asset_id WHERE ${lf.sql} AND i.status IN ('open','in_progress')`, ...lf.params)).n;
     if (can(access, 'transfer.approve'))
-      out.transfers_pending = (await db.get("SELECT COUNT(*) n FROM transfers WHERE status='pending'")).n;
+    {
+      const f1 = locationFilter(access, 't.from_location_id'), f2 = locationFilter(access, 't.to_location_id');
+      out.transfers_pending = (await db.get(`SELECT COUNT(*) n FROM transfers t WHERE t.status='pending' AND (${f1.sql} OR ${f2.sql})`, ...f1.params, ...f2.params)).n;
+    }
     if (can(access, 'accounting.view')) {
       const rows = await db.all(`SELECT a.original_cost, a.useful_life_months, a.in_service_date, a.purchase_date ${active} AND a.original_cost > 0`, ...lf.params);
       let cost = 0, remain = 0;

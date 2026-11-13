@@ -31,6 +31,8 @@
   // Cấu hình không bí mật. Thông tin bí mật (ADMIN_PASSWORD, GOOGLE_CLIENT_SECRET, SMS_WEBHOOK_TOKEN...)
   // khai báo bằng: npx wrangler secret put TEN_BIEN  (hoặc trên Dashboard → Settings → Variables and Secrets)
   "vars": {
+    // production: cookie phiên có cờ Secure, bật HSTS, tắt OTP khi chưa cấu hình SMS
+    "NODE_ENV": "production",
     "PUBLIC_BASE_URL": "https://taisan.soibien.vn",
     "COMPANY_NAME": "CÔNG TY CỔ PHẦN SÓI BIỂN TRUNG THỰC",
     "COMPANY_SHORT": "SÓI BIỂN",
